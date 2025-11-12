@@ -6,44 +6,35 @@ on:
             - main
 
 jobs:
-    build-and-deploy:
+    deploy:
         runs-on: ubuntu-latest
-
         steps:
             - name: checkout
               uses: actions/checkout@v4
 
-            - name: setup node
+            - name: npm
               uses: actions/setup-node@v4
               with:
-                  node-version: "18"
+                  node-version: "20"
                   cache: "npm"
 
-            - name: npm run build
-              run: |
-                  npm ci
-                  npm run build
+            - name: npm ci
+              run: npm ci
 
-            - name: deploy directories
+            - name: npm run build
+              run: npm run build
+
+            - name: Deploy Files to Server
               uses: easingthemes/ssh-deploy@v5.0.0
               with:
                   SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
                   REMOTE_HOST: ${{ secrets.EC2_HOST }}
                   REMOTE_USER: ${{ secrets.EC2_USER }}
-                  SOURCE: ".next/ public/"
+                  SOURCE: ".next/ public/ package.json package-lock.json next.config.js"
                   TARGET: "/var/www/spiderweb"
                   ARGS: "--delete"
 
-            - name: config files
-              uses: easingthemes/ssh-deploy@v5.0.0
-              with:
-                  SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
-                  REMOTE_HOST: ${{ secrets.EC2_HOST }}
-                  REMOTE_USER: ${{ secrets.EC2_USER }}
-                  SOURCE: "package.json package-lock.json next.config.js"
-                  TARGET: "/var/www/spiderweb"
-
-            - name: restart pm2
+            - name: Install Prod Dependencies and Reload App
               uses: appleboy/ssh-action@v1.0.3
               with:
                   host: ${{ secrets.EC2_HOST }}
@@ -54,10 +45,10 @@ jobs:
                       npm ci --production
                       pm2 describe spiderweb > /dev/null
                       if [ $? -eq 0 ]; then
-                          echo "spiderweb already exists"
-                          pm2 restart spiderweb
+                        echo "spiderweb found, reloading for zero-downtime..."
+                        pm2 reload spiderweb
                       else
-                          echo "starting on port 3000"
-                          pm2 start npm --name "spiderweb" -- start
+                        echo "spiderweb not found, starting new process..."
+                        pm2 start npm --name "spiderweb" -- start
                       fi
                       pm2 save

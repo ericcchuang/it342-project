@@ -52,5 +52,12 @@ jobs:
                   script: |
                       cd /var/www/spiderweb
                       npm ci --production
-                      pm2 restart spiderweb || pm2 start npm --name "spiderweb" -- start -p 3000
+                      pm2 describe spiderweb > /dev/null
+                      if [ $? -eq 0 ]; then
+                          echo "spiderweb already exists"
+                          pm2 restart spiderweb
+                      else
+                          echo "starting on port 3000"
+                          pm2 start npm --name "spiderweb" -- start -p 3000
+                      fi
                       pm2 save

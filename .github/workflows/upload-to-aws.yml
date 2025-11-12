@@ -24,18 +24,26 @@ jobs:
                   npm ci
                   npm run build
 
-            - name: deploy
+            - name: deploy directories
               uses: easingthemes/ssh-deploy@v5.0.0
               with:
                   SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
                   REMOTE_HOST: ${{ secrets.EC2_HOST }}
                   REMOTE_USER: ${{ secrets.EC2_USER }}
-
-                  SOURCE: ".next/ public/ package.json package-lock.json next.config.js"
+                  SOURCE: ".next/ public/"
                   TARGET: "/var/www/spiderweb"
                   ARGS: "--delete"
 
-            - name: restart server
+            - name: config files
+              uses: easingthemes/ssh-deploy@v5.0.0
+              with:
+                  SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+                  REMOTE_HOST: ${{ secrets.EC2_HOST }}
+                  REMOTE_USER: ${{ secrets.EC2_USER }}
+                  SOURCE: "package.json package-lock.json next.config.js"
+                  TARGET: "/var/www/spiderweb"
+
+            - name: restart pm2
               uses: appleboy/ssh-action@v1.0.3
               with:
                   host: ${{ secrets.EC2_HOST }}

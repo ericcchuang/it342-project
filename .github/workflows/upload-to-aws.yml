@@ -1,27 +1,48 @@
-name: Deploy to AWS S3
+name: Build and Deploy to EC2
 
 on:
     push:
+        branches:
+            - main
 
 jobs:
-    deploy:
+    build-and-deploy:
         runs-on: ubuntu-latest
-        env:
-            AWS_S3_BUCKET: it342-spiderweb
-            AWS_REGION: us-east-2
-            SOURCE_DIR: ./
 
         steps:
             - name: checkout
               uses: actions/checkout@v4
 
-            - name: aws credentials
-              uses: aws-actions/configure-aws-credentials@v4
+            - name: setup node
+              uses: actions/setup-node@v4
               with:
-                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-                  aws-region: ${{ env.AWS_REGION }}
+                  node-version: "18"
+                  cache: "npm"
 
-            - name: upload to s3
+            - name: npm run build
               run: |
-                  aws s3 sync ${{ env.SOURCE_DIR }} s3://${{ env.AWS_S3_BUCKET }} --delete
+                  npm ci
+                  npm run build
+
+            - name: deploy
+              uses: easing-themes/ssh-deploy@v5.0.0
+              with:
+                  SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+                  REMOTE_HOST: ${{ secrets.EC2_HOST }}
+                  REMOTE_USER: ${{ secrets.EC2_USER }}
+
+                  SOURCE: ".next/, public/, package.json, package-lock.json, next.config.mjs"
+                  TARGET: "/var/www/spiderweb"
+                  ARGS: "--delete"
+
+            - name: restart server
+              uses: appleboy/ssh-action@v1.0.3
+              with:
+                  host: ${{ secrets.EC2_HOST }}
+                  username: ${{ secrets.EC2_USER }}
+                  key: ${{ secrets.EC2_SSH_KEY }}
+                  script: |
+                      cd /var/www/spiderweb
+                      npm ci --production
+                      pm2 restart spiderweb || pm2 start npm --name "spiderweb" -- start -p 3000
+                      pm2 save

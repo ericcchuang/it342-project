@@ -24,15 +24,24 @@ jobs:
             - name: npm run build
               run: npm run build
 
-            - name: Deploy Files to Server
+            - name: deploy directories
               uses: easingthemes/ssh-deploy@v5.0.0
               with:
                   SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
                   REMOTE_HOST: ${{ secrets.EC2_HOST }}
                   REMOTE_USER: ${{ secrets.EC2_USER }}
-                  SOURCE: ".next/ public/ package.json package-lock.json next.config.js"
+                  SOURCE: ".next/ public/"
                   TARGET: "/var/www/spiderweb"
                   ARGS: "--delete"
+
+            - name: config files
+              uses: easingthemes/ssh-deploy@v5.0.0
+              with:
+                  SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+                  REMOTE_HOST: ${{ secrets.EC2_HOST }}
+                  REMOTE_USER: ${{ secrets.EC2_USER }}
+                  SOURCE: "package.json package-lock.json next.config.js"
+                  TARGET: "/var/www/spiderweb"
 
             - name: Install Prod Dependencies and Reload App
               uses: appleboy/ssh-action@v1.0.3

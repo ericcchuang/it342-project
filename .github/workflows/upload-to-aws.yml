@@ -25,7 +25,7 @@ jobs:
                   npm run build
 
             - name: deploy
-              uses: easing-themes/ssh-deploy@v5.0.0
+              uses: easingthemes/ssh-deploy@v5.0.0
               with:
                   SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
                   REMOTE_HOST: ${{ secrets.EC2_HOST }}

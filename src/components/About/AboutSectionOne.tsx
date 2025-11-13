@@ -37,7 +37,7 @@ const AboutSectionOne = () => {
                   <div className="w-full px-3 sm:w-1/2 lg:w-full xl:w-1/2">
                     <List text="Filtered Searching" />
                     <List text="Wishlists of Developers" />
-                    <List text="Direct MEssaging system" />
+                    <List text="Direct Messaging system" />
                   </div>
 
                   <div className="w-full px-3 sm:w-1/2 lg:w-full xl:w-1/2">

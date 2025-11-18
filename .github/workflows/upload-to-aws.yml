@@ -1,63 +1,78 @@
 name: Build and Deploy to EC2
 
 on:
-    push:
-        branches:
-            - main
+  push:
+    branches:
+      - main
 
 jobs:
-    deploy:
-        runs-on: ubuntu-latest
-        steps:
-            - name: checkout
-              uses: actions/checkout@v4
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
 
-            - name: npm
-              uses: actions/setup-node@v4
-              with:
-                  node-version: "20"
-                  cache: "npm"
+      - name: npm
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
 
-            - name: npm ci
-              run: npm ci
+      - name: npm ci
+        run: npm ci
 
-            - name: npm run build
-              run: npm run build
+      - name: npm run build
+        run: npm run build
 
-            - name: deploy directories
-              uses: easingthemes/ssh-deploy@v5.0.0
-              with:
-                  SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
-                  REMOTE_HOST: ${{ secrets.EC2_HOST }}
-                  REMOTE_USER: ${{ secrets.EC2_USER }}
-                  SOURCE: ".next public/"
-                  TARGET: "/var/www/spiderweb"
-                  ARGS: "--delete"
+      - name: deploy directories
+        uses: easingthemes/ssh-deploy@v5.0.0
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+          REMOTE_HOST: ${{ secrets.EC2_HOST }}
+          REMOTE_USER: ${{ secrets.EC2_USER }}
+          SOURCE: ".next public/"
+          TARGET: "/var/www/spiderweb"
+          ARGS: "--delete"
 
-            - name: config files
-              uses: easingthemes/ssh-deploy@v5.0.0
-              with:
-                  SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
-                  REMOTE_HOST: ${{ secrets.EC2_HOST }}
-                  REMOTE_USER: ${{ secrets.EC2_USER }}
-                  SOURCE: "package.json package-lock.json next.config.js"
-                  TARGET: "/var/www/spiderweb"
+      - name: config files
+        uses: easingthemes/ssh-deploy@v5.0.0
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+          REMOTE_HOST: ${{ secrets.EC2_HOST }}
+          REMOTE_USER: ${{ secrets.EC2_USER }}
+          SOURCE: "package.json package-lock.json next.config.js"
+          TARGET: "/var/www/spiderweb"
 
-            - name: Install Prod Dependencies and Reload App
-              uses: appleboy/ssh-action@v1.0.3
-              with:
-                  host: ${{ secrets.EC2_HOST }}
-                  username: ${{ secrets.EC2_USER }}
-                  key: ${{ secrets.EC2_SSH_KEY }}
-                  script: |
-                      cd /var/www/spiderweb
-                      npm ci --production
-                      pm2 describe spiderweb > /dev/null
-                      if [ $? -eq 0 ]; then
-                        echo "spiderweb found, reloading for zero-downtime..."
-                        pm2 reload spiderweb
-                      else
-                        echo "spiderweb not found, starting new process..."
-                        pm2 start npm --name "spiderweb" -- start
-                      fi
-                      pm2 save
+      - name: Install Prod Dependencies, Create .env, and Reload App
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /var/www/spiderweb
+
+            echo "Creating prod.env file..."
+            cat << EOF > prod.env
+            NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
+            NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
+
+            PG_HOST=${{ secrets.PG_HOST }}
+            PG_USER=${{ secrets.PG_USER }}
+            PG_PASSWORD=${{ secrets.PG_PASSWORD }}
+            PG_DATABASE=postgres
+            PG_PORT=5432
+            EOF
+            echo "prod.env created successfully."
+
+            npm ci --production
+
+            pm2 describe spiderweb > /dev/null
+            if [ $? -eq 0 ]; then
+              echo "spiderweb found, reloading for zero-downtime..."
+              pm2 reload spiderweb
+            else
+              echo "spiderweb not found, starting new process..."
+              pm2 start npm --name "spiderweb" -- start
+            fi
+            pm2 save

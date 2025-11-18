@@ -67,12 +67,6 @@ jobs:
 
             npm ci --production
 
-            pm2 describe spiderweb > /dev/null
-            if [ $? -eq 0 ]; then
-              echo "spiderweb found, reloading for zero-downtime..."
-              pm2 reload spiderweb
-            else
-              echo "spiderweb not found, starting new process..."
-              pm2 start npm --name "spiderweb" -- start
-            fi
+            pm2 startOrRestart ecosystem.config.js --update-env
+                      
             pm2 save

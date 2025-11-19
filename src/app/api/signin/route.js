@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { POST as NextAuthPOST } from "../api/auth/[...nextauth]/route";
+import { POST as NextAuthPOST } from "@/app/api/auth/[...nextauth]/route";
 
 export async function POST(request) {
   const body = await request.json();

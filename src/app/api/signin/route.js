@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { handler } from "@/lib/auth";
-export { handler as GET, handler as POST };
+import { POST as NextAuthPOST } from "../api/auth/[...nextauth]/route";
 
 export async function POST(request) {
   const body = await request.json();

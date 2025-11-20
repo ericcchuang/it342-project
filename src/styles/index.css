@@ -16,17 +16,17 @@ layer(base);
 
   --color-current: currentColor;
   --color-transparent: transparent;
-  --color-white: #ffffff;
-  --color-black: #121723;
-  --color-dark: #1d2430;
-  --color-primary: #4a6cf7;
-  --color-yellow: #fbb040;
-  --color-bg-color-dark: #171c28;
+  --color-white: #FFFFFF;
+  --color-black: #FFDB58;
+  --color-dark: #00FFFF;
+  --color-primary: #FF69B4;
+  --color-yellow: #800020;
+  --color-bg-color-dark: #FFA500;
+  /* above colors changed */
+  --color-body-color: #800869;
+  --color-body-color-dark: #800869;
 
-  --color-body-color: #788293;
-  --color-body-color-dark: #959cb1;
-
-  --color-stroke-stroke: #e3e8ef;
+  --color-stroke-stroke: #D1CC00; 
   --color-stroke-dark: #353943;
 
   --color-gray-50: #f9fafb;
@@ -40,10 +40,10 @@ layer(base);
   --color-gray-800: #1f2937;
   --color-gray-900: #111827;
   --color-gray-950: #030712;
-  --color-gray-dark: #1e232e;
+  --color-gray-dark: #F46607;
   --color-gray-light: #f0f2f9;
 
-  --shadow-sign-up: 0px 5px 10px rgba(4, 10, 34, 0.2);
+  --shadow-sign-up: 0px 5px 10px rgba(100, 255, 34, 0.2);
   --shadow-one: 0px 2px 3px rgba(7, 7, 77, 0.05);
   --shadow-two: 0px 5px 10px rgba(6, 8, 15, 0.1);
   --shadow-three: 0px 5px 15px rgba(6, 8, 15, 0.05);
@@ -124,7 +124,7 @@ layer(base);
 
 @layer base {
   body {
-    font-family: "Inter", sans-serif;
+    font-family: "Comic Sans", serif;
   }
 }
 

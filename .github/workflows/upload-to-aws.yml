@@ -68,6 +68,10 @@ jobs:
 
             npm ci --omit=dev
 
+            set -a
+            source prod.env
+            set +a
+
             pm2 startOrRestart ecosystem.config.js --update-env
                       
             pm2 save

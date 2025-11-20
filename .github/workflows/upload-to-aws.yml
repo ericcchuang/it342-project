@@ -40,7 +40,7 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
           REMOTE_HOST: ${{ secrets.EC2_HOST }}
           REMOTE_USER: ${{ secrets.EC2_USER }}
-          SOURCE: "package.json package-lock.json next.config.js"
+          SOURCE: "package.json package-lock.json next.config.js ecosystem.config.js"
           TARGET: "/var/www/spiderweb"
 
       - name: Install Prod Dependencies, Create .env, and Reload App

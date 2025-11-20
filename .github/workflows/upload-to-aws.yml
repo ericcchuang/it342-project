@@ -71,6 +71,8 @@ jobs:
             set -a
             source prod.env
             set +a
+            pm2 stop spiderweb || true
+            pm2 delete spiderweb || true
 
             pm2 startOrRestart ecosystem.config.js --update-env
                       

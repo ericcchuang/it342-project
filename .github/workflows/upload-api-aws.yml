@@ -48,14 +48,24 @@ jobs:
           cache: "npm"
           cache-dependency-path: "api/package-lock.json"
 
-      - name: Deploy Express API Code
+      - name: deploy directories
         uses: easingthemes/ssh-deploy@v5.0.0
         with:
-          SSH_PRIVATE_KEY: ${{ secrets.EC2_API_SSH_KEY }}
-          REMOTE_HOST: ${{ secrets.EC2_API_HOST }}
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+          REMOTE_HOST: ${{ secrets.EC2_HOST }}
           REMOTE_USER: ${{ secrets.EC2_USER }}
-          SOURCE: "api/server.js api/api-ecosystem.config.js api/package.json api/package-lock.json"
-          TARGET: "/var/www/spiderwebapi"
+          SOURCE: "api/express.js"
+          TARGET: "/var/www/spiderweb"
+          ARGS: "--delete"
+
+      - name: config files
+        uses: easingthemes/ssh-deploy@v5.0.0
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+          REMOTE_HOST: ${{ secrets.EC2_HOST }}
+          REMOTE_USER: ${{ secrets.EC2_USER }}
+          SOURCE: "api/package.json api/package-lock.json api/ecosystem.config.js"
+          TARGET: "/var/www/spiderweb"
 
       - name: Configure Environment and Reload API on EC2
         uses: appleboy/ssh-action@v1.0.3
@@ -82,8 +92,21 @@ jobs:
 
             npm ci --omit=dev
 
-            pm2 reload api-ecosystem.config.js || pm2 start api-ecosystem.config.js
+            set -a
+            source prod.env
+            set +a
+            pm2 stop spiderwebapi || true
+            pm2 delete spiderwebapi || true
 
-            pm2 reload ecosystem.config.js || pm2 start ecosystem.config.js
-
+            pm2 startOrRestart ecosystem.config.js --update-env
+                      
             pm2 save
+
+      - name: Revoke Runner IP Address (Cleanup)
+        if: always()
+        run: |
+          aws ec2 revoke-security-group-ingress \
+            --group-id ${{ env.AWS_SG_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.ip.outputs.ipv4 }}/32

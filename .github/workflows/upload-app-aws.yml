@@ -54,15 +54,24 @@ jobs:
       - name: Build Next.js Application
         run: cd app && npm run build
 
-      - name: Deploy Next.js Build Output (Assets and Config)
+      - name: deploy directories
         uses: easingthemes/ssh-deploy@v5.0.0
         with:
           SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
           REMOTE_HOST: ${{ secrets.EC2_HOST }}
           REMOTE_USER: ${{ secrets.EC2_USER }}
-          SOURCE: "app/.next/ app/public/ app/package.json app/package-lock.json app/next.config.js app/ecosystem.config.js"
+          SOURCE: "app/.next app/public/"
           TARGET: "/var/www/spiderweb"
           ARGS: "--delete"
+
+      - name: config files
+        uses: easingthemes/ssh-deploy@v5.0.0
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+          REMOTE_HOST: ${{ secrets.EC2_HOST }}
+          REMOTE_USER: ${{ secrets.EC2_USER }}
+          SOURCE: "app/package.json app/package-lock.json app/next.config.js app/ecosystem.config.js"
+          TARGET: "/var/www/spiderweb"
 
       - name: Reload Next.js App on EC2
         uses: appleboy/ssh-action@v1.0.3
@@ -81,13 +90,16 @@ jobs:
             EOF
             echo "prod.env created successfully."
 
-            rm -rf node_modules
-
             npm ci --omit=dev
 
+            set -a
+            source prod.env
+            set +a
             pm2 stop spiderweb || true
             pm2 delete spiderweb || true
+
             pm2 startOrRestart ecosystem.config.js --update-env
+                      
             pm2 save
 
       - name: Revoke Runner IP Address (Cleanup)

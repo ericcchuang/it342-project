@@ -73,17 +73,20 @@ jobs:
           script: |
             cd /var/www/spiderweb
 
-            npm cache clean --force
+            echo "Creating prod.env file for Next.js..."
+            cat << EOF > prod.env
+            NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
+            NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
+            NEXT_PUBLIC_API_URL=http://${{ secrets.EC2_API_HOST }}:3001/api 
+            EOF
+            echo "prod.env created successfully."
+
+            rm -rf node_modules
+            rm -f package-lock.json
+
             npm ci --omit=dev
 
-            set -a
-            source prod.env
-            set +a
-            pm2 stop spiderweb || true
-            pm2 delete spiderweb || true
-
-            pm2 startOrRestart ecosystem.config.js --update-env
-                      
+            pm2 reload ecosystem.config.js || pm2 start ecosystem.config.js
             pm2 save
 
       - name: Revoke Runner IP Address (Cleanup)

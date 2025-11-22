@@ -85,6 +85,8 @@ jobs:
 
             npm ci --omit=dev
 
+            pm2 stop spiderweb || true
+            pm2 delete spiderweb || true
             pm2 reload ecosystem.config.js || pm2 start ecosystem.config.js
             pm2 save
 

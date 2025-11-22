@@ -55,7 +55,7 @@ jobs:
           REMOTE_HOST: ${{ secrets.EC2_API_HOST }}
           REMOTE_USER: ${{ secrets.EC2_USER }}
           SOURCE: "api/server.js api/api-ecosystem.config.js api/package.json api/package-lock.json"
-          TARGET: "/var/www/spiderweb"
+          TARGET: "/var/www/spiderwebapi"
 
       - name: Configure Environment and Reload API on EC2
         uses: appleboy/ssh-action@v1.0.3
@@ -64,7 +64,7 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            cd /var/www/spiderweb
+            cd /var/www/spiderwebapi
 
             echo "Creating prod.env file with secrets..."
             cat << EOF > prod.env

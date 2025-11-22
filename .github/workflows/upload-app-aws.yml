@@ -76,5 +76,21 @@ jobs:
             npm cache clean --force
             npm ci --omit=dev
 
-            pm2 reload ecosystem.config.js || pm2 start ecosystem.config.js
+            set -a
+            source prod.env
+            set +a
+            pm2 stop spiderweb || true
+            pm2 delete spiderweb || true
+
+            pm2 startOrRestart ecosystem.config.js --update-env
+                      
             pm2 save
+
+      - name: Revoke Runner IP Address (Cleanup)
+        if: always()
+        run: |
+          aws ec2 revoke-security-group-ingress \
+            --group-id ${{ env.AWS_SG_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.ip.outputs.ipv4 }}/32

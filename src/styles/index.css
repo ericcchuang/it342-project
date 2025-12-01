@@ -22,14 +22,16 @@ layer(base);
   --color-primary: #FF69B4;
   --color-yellow: #800020;
   --color-bg-color-dark: #FFA500;
-  /* above colors changed */
+  
   --color-body-color: #800869;
   --color-body-color-dark: #800869;
 
   --color-stroke-stroke: #D1CC00; 
-  --color-stroke-dark: #353943;
 
-  --color-gray-50: #f9fafb;
+  --color-stroke-dark: #B3FFBF;
+ 
+  --color-gray-50: #FF7F50;
+   /* above colors changed */
   --color-gray-100: #f3f4f6;
   --color-gray-200: #e5e7eb;
   --color-gray-300: #d1d5db;
@@ -41,7 +43,7 @@ layer(base);
   --color-gray-900: #111827;
   --color-gray-950: #030712;
   --color-gray-dark: #F46607;
-  --color-gray-light: #f0f2f9;
+  --color-gray-light: #98FF98;
 
   --shadow-sign-up: 0px 5px 10px rgba(100, 255, 34, 0.2);
   --shadow-one: 0px 2px 3px rgba(7, 7, 77, 0.05);

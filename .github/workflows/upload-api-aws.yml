@@ -12,9 +12,11 @@ on:
 jobs:
   deploy-backend:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     env:
       AWS_REGION: ${{ secrets.AWS_REGION }}
-      AWS_SG_ID: ${{ secrets.BACKEND_SG_ID }}
 
     steps:
       - name: Configure AWS Credentials
@@ -24,89 +26,35 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Get Runner IP Address
-        id: ip
-        uses: haythem/public-ip@v1.2
-
-      - name: Whitelist Runner IP (Allow SSH Ingress on Port 22)
+      - name: Deploy via AWS Systems Manager
         run: |
-          aws ec2 authorize-security-group-ingress \
-              --group-id ${{ env.AWS_SG_ID }} \
-              --protocol tcp \
-              --port 22 \
-              --cidr ${{ steps.ip.outputs.ipv4 }}/32
-        env:
-          RUNNER_IP: ${{ steps.ip.outputs.ipv4 }}
+          aws ssm send-command \
+            --instance-ids "${{ secrets.EC2_API_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploying API to Private EC2" \
+            --output text \
+            --parameters 'commands=[
+              "#!/bin/bash",
+              
+              "sudo su - ec2-user -c \"mkdir -p /var/www/spiderweb\"",
+              "sudo su - ec2-user -c \"cd /var/www/spiderweb && git init\"",
+              "sudo su - ec2-user -c \"cd /var/www/spiderweb && git remote add origin https://github.com/${{ github.repository }}.git || git remote set-url origin https://github.com/${{ github.repository }}.git\"",
+              
+              "sudo su - ec2-user -c \"cd /var/www/spiderweb && git config core.sparseCheckout true\"",
+              "sudo su - ec2-user -c \"cd /var/www/spiderweb && echo 'api/' > .git/info/sparse-checkout\"",
+              
+              "sudo su - ec2-user -c \"cd /var/www/spiderweb && git pull origin main\"",
 
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+              "sudo su - ec2-user -c \"cd /var/www/spiderweb/api && echo NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }} > prod.env\"",
+              "sudo su - ec2-user -c \"cd /var/www/spiderweb/api && echo NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }} >> prod.env\"",
+              "sudo su - ec2-user -c \"cd /var/www/spiderweb/api && echo NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }} >> prod.env\"",
+              "sudo su - ec2-user -c \"cd /var/www/spiderweb/api && echo PG_HOST=${{ secrets.PG_HOST }} >> prod.env\"",
+              "sudo su - ec2-user -c \"cd /var/www/spiderweb/api && echo PG_USER=${{ secrets.PG_USER }} >> prod.env\"",
+              "sudo su - ec2-user -c \"cd /var/www/spiderweb/api && echo PG_PASSWORD=${{ secrets.PG_PASSWORD }} >> prod.env\"",
+              "sudo su - ec2-user -c \"cd /var/www/spiderweb/api && echo PG_DATABASE=postgres >> prod.env\"",
+              "sudo su - ec2-user -c \"cd /var/www/spiderweb/api && echo PG_PORT=5432 >> prod.env\"",
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: "api/package-lock.json"
-
-      - name: deploy directories
-        uses: easingthemes/ssh-deploy@v5.0.0
-        with:
-          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
-          REMOTE_HOST: ${{ secrets.EC2_HOST }}
-          REMOTE_USER: ${{ secrets.EC2_USER }}
-          SOURCE: "api/express.js"
-          TARGET: "/var/www/spiderweb"
-          ARGS: "--delete"
-
-      - name: config files
-        uses: easingthemes/ssh-deploy@v5.0.0
-        with:
-          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
-          REMOTE_HOST: ${{ secrets.EC2_HOST }}
-          REMOTE_USER: ${{ secrets.EC2_USER }}
-          SOURCE: "api/package.json api/package-lock.json api/ecosystem.config.js"
-          TARGET: "/var/www/spiderweb"
-
-      - name: Configure Environment and Reload API on EC2
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd /var/www/spiderwebapi
-
-            echo "Creating prod.env file with secrets..."
-            cat << EOF > prod.env
-            NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
-            NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
-            NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
-
-            PG_HOST=${{ secrets.PG_HOST }}
-            PG_USER=${{ secrets.PG_USER }}
-            PG_PASSWORD=${{ secrets.PG_PASSWORD }}
-            PG_DATABASE=postgres
-            PG_PORT=5432
-            EOF
-            echo "prod.env created successfully."
-
-            npm ci --omit=dev
-
-            set -a
-            source prod.env
-            set +a
-            pm2 stop spiderwebapi || true
-            pm2 delete spiderwebapi || true
-
-            pm2 startOrRestart ecosystem.config.js --update-env
-                      
-            pm2 save
-
-      - name: Revoke Runner IP Address (Cleanup)
-        if: always()
-        run: |
-          aws ec2 revoke-security-group-ingress \
-            --group-id ${{ env.AWS_SG_ID }} \
-            --protocol tcp \
-            --port 22 \
-            --cidr ${{ steps.ip.outputs.ipv4 }}/32
+              "sudo su - ec2-user -c \"cd /var/www/spiderweb/api && npm ci --omit=dev\"",
+              "sudo su - ec2-user -c \"cd /var/www/spiderweb/api && pm2 reload ecosystem.config.js --update-env --env production || pm2 start ecosystem.config.js --env production\"",
+              "sudo su - ec2-user -c \"pm2 save\""
+            ]'

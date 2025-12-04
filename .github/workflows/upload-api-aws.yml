@@ -10,51 +10,45 @@ on:
       - ".github/workflows/upload-api-aws.yml"
 
 jobs:
-  deploy-backend:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-    env:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
 
     steps:
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+      - uses: actions/checkout@v3
 
-      - name: Deploy via AWS Systems Manager
+      - name: Install Dependencies & Build
+        run: |
+          cd api
+          npm ci
+          npm run build 
+          npm prune --production
+
+      - name: Create Artifact
+        run: |
+          cd api
+          zip -r ../api-deployment.zip . *
+
+      - name: Upload to S3
+        run: |
+          aws s3 cp api-deployment.zip s3://YOUR-BUCKET-NAME/api-deployment.zip
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy on Private EC2
         run: |
           aws ssm send-command \
             --instance-ids "${{ secrets.EC2_API_INSTANCE_ID }}" \
             --document-name "AWS-RunShellScript" \
-            --comment "Deploying API to Private EC2" \
-            --output text \
             --parameters 'commands=[
-              "#!/bin/bash",
-              
-              "sudo su - ec2-user -c \"mkdir -p /var/www/spiderweb\"",
-              "sudo su - ec2-user -c \"cd /var/www/spiderweb && git init\"",
-              "sudo su - ec2-user -c \"cd /var/www/spiderweb && git remote add origin https://github.com/${{ github.repository }}.git || git remote set-url origin https://github.com/${{ github.repository }}.git\"",
-              
-              "sudo su - ec2-user -c \"cd /var/www/spiderweb && git config core.sparseCheckout true\"",
-              "sudo su - ec2-user -c \"cd /var/www/spiderweb && echo 'api/' > .git/info/sparse-checkout\"",
-              
-              "sudo su - ec2-user -c \"cd /var/www/spiderweb && git pull origin main\"",
-
-              "sudo su - ec2-user -c \"cd /var/www/spiderweb/api && echo NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }} > prod.env\"",
-              "sudo su - ec2-user -c \"cd /var/www/spiderweb/api && echo NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }} >> prod.env\"",
-              "sudo su - ec2-user -c \"cd /var/www/spiderweb/api && echo NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }} >> prod.env\"",
-              "sudo su - ec2-user -c \"cd /var/www/spiderweb/api && echo PG_HOST=${{ secrets.PG_HOST }} >> prod.env\"",
-              "sudo su - ec2-user -c \"cd /var/www/spiderweb/api && echo PG_USER=${{ secrets.PG_USER }} >> prod.env\"",
-              "sudo su - ec2-user -c \"cd /var/www/spiderweb/api && echo PG_PASSWORD=${{ secrets.PG_PASSWORD }} >> prod.env\"",
-              "sudo su - ec2-user -c \"cd /var/www/spiderweb/api && echo PG_DATABASE=postgres >> prod.env\"",
-              "sudo su - ec2-user -c \"cd /var/www/spiderweb/api && echo PG_PORT=5432 >> prod.env\"",
-
-              "sudo su - ec2-user -c \"cd /var/www/spiderweb/api && npm ci --omit=dev\"",
-              "sudo su - ec2-user -c \"cd /var/www/spiderweb/api && pm2 reload ecosystem.config.js --update-env --env production || pm2 start ecosystem.config.js --env production\"",
-              "sudo su - ec2-user -c \"pm2 save\""
-            ]'
+              "sudo su - ec2-user -c \"aws s3 cp s3://YOUR-BUCKET-NAME/api-deployment.zip /tmp/deployment.zip\"",
+              "sudo su - ec2-user -c \"mkdir -p /var/www/spiderweb/api\"",
+              "sudo su - ec2-user -c \"unzip -o /tmp/deployment.zip -d /var/www/spiderweb/api\"",
+              "sudo su - ec2-user -c \"cd /var/www/spiderweb/api && pm2 restart all --update-env\""
+            ]' \
+            --comment "Deploy from S3 Artifact"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}

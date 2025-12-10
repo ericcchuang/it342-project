@@ -150,7 +150,7 @@ jobs:
 
             cd ~/spiderweb-api/api
 
-            pm2 reload ecosystem.config.js --update-env --env production || pm2 start ecosystem.config.cjs --env production
+            pm2 reload ecosystem.config.cjs --update-env --env production || pm2 start ecosystem.config.cjs --env production
             pm2 save
 
             echo "Deployment Successful!"

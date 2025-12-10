@@ -1,8 +1,10 @@
-name: Deploy Backend via Bastion
+name: Deploy Backend
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - "main"
+      - "refactoring"
     paths:
       - "api/**"
       - ".github/workflows/upload-api-aws.yml"

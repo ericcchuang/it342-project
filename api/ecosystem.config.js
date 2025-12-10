@@ -2,11 +2,10 @@ module.exports = {
   apps: [
     {
       name: "spiderwebapi",
-      script: "npm",
-      args: "start",
+      script: "./api/express.js",
       env: {
         NODE_ENV: "production",
-        PORT: 3001,
+        PORT: 3000,
       },
       env_file: "prod.env",
       exec_mode: "fork",

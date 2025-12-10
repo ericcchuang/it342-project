@@ -26,7 +26,7 @@ jobs:
 
       - name: Get Runner IP Address
         id: ip
-        uses: haythem/public-ip@v1.2
+        run: echo "ipv4=$(curl -s https://checkip.amazonaws.com)" >> $GITHUB_OUTPUT
 
       - name: Whitelist Runner IP (Allow SSH Ingress on Port 22)
         run: |

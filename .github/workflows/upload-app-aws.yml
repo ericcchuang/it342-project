@@ -1,0 +1,113 @@
+name: Frontend (Next.js) Deployment
+
+on:
+  push:
+    branches:
+      - main
+      - refactoring
+    paths:
+      - "app/**"
+      - ".github/workflows/upload-app-aws.yml"
+
+jobs:
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_SG_ID: ${{ secrets.FRONTEND_SG_ID }}
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get Runner IP Address
+        id: ip
+        run: echo "ipv4=$(curl -s https://checkip.amazonaws.com)" >> $GITHUB_OUTPUT
+
+      - name: Whitelist Runner IP (Allow SSH Ingress on Port 22)
+        run: |
+          aws ec2 authorize-security-group-ingress \
+            --group-id ${{ env.AWS_SG_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.ip.outputs.ipv4 }}/32
+        env:
+          RUNNER_IP: ${{ steps.ip.outputs.ipv4 }}
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: "app/package-lock.json"
+
+      - name: Install Frontend Dependencies
+        run: cd app && npm ci
+
+      - name: Build Next.js Application
+        env:
+          NEXT_PUBLIC_API_URL: /api
+        run: cd app && npm run build
+
+      - name: deploy directories
+        uses: easingthemes/ssh-deploy@v5.0.0
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+          REMOTE_HOST: ${{ secrets.EC2_HOST }}
+          REMOTE_USER: ${{ secrets.EC2_USER }}
+          SOURCE: "app/.next app/public/"
+          TARGET: "/var/www/spiderweb"
+          ARGS: "--delete"
+
+      - name: config files
+        uses: easingthemes/ssh-deploy@v5.0.0
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+          REMOTE_HOST: ${{ secrets.EC2_HOST }}
+          REMOTE_USER: ${{ secrets.EC2_USER }}
+          SOURCE: "app/package.json app/package-lock.json app/next.config.js app/ecosystem.config.js"
+          TARGET: "/var/www/spiderweb"
+
+      - name: Reload Next.js App on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /var/www/spiderweb
+
+            echo "Creating prod.env file for Next.js..."
+            cat << EOF > prod.env
+            NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
+            NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
+            EOF
+            echo "prod.env created successfully."
+
+            npm ci --omit=dev
+
+            set -a
+            source prod.env
+            set +a
+            pm2 stop spiderweb || true
+            pm2 delete spiderweb || true
+
+            pm2 startOrRestart ecosystem.config.js --update-env
+                      
+            pm2 save
+
+      - name: Revoke Runner IP Address (Cleanup)
+        if: always()
+        run: |
+          aws ec2 revoke-security-group-ingress \
+            --group-id ${{ env.AWS_SG_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.ip.outputs.ipv4 }}/32

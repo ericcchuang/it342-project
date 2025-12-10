@@ -4,63 +4,64 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-const SignupPage = () => {
+const SigninPage = () => {
   const router = useRouter();
+  const API_BASE_URL =
+    process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+  const API_SIGNIN_URL = `${API_BASE_URL}/auth/signin`;
+
   const [formData, setFormData] = useState({
     userid: "",
     password: "",
-    vendorID: "1",
-    clientID: "1",
+    rememberMe: false,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const value =
+      e.target.type === "checkbox" ? e.target.checked : e.target.value;
+    setFormData({ ...formData, [e.target.name]: value });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    console.log("login attempt", formData);
+    if (e && "preventDefault" in e) {
+      e.preventDefault();
+    }
+
+    if (loading) return;
+
     setLoading(true);
     setError(null);
-    setSuccess(null);
-
-    const apiPayload = {
-      userid: formData.userid,
-      password: formData.password,
-      vendorID: formData.vendorID,
-      clientID: formData.clientID,
-    };
 
     try {
-      const response = await fetch("/api/signup", {
+      const response = await fetch(API_SIGNIN_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(apiPayload),
+        body: JSON.stringify({
+          userid: formData.userid,
+          password: formData.password,
+        }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        setSuccess("account created");
-        setFormData({
-          userid: "",
-          password: "",
-          vendorID: "1",
-          clientID: "1",
-        });
-
-        setTimeout(() => {
-          router.push("/signin");
-        }, 1500);
+        const token = data.token;
+        localStorage.setItem("authToken", token);
+        console.log("Login successful.");
+        setError(null);
+        router.push("/blog");
       } else {
-        setError(data.message || "failed to create account");
+        console.error("Authentication failed:", data.message);
+        setError(data.message || "Invalid username or password.");
       }
-    } catch (err) {
-      console.error("Signup fetch error:", err);
+      // --- End New Authentication Logic ---
+    } catch (e) {
+      console.error("Network or server error during sign-in:", e);
       setError("A network error occurred.");
     } finally {
       setLoading(false);
@@ -75,24 +76,11 @@ const SignupPage = () => {
             <div className="w-full px-4">
               <div className="shadow-three dark:bg-dark mx-auto max-w-[500px] rounded-sm bg-white px-6 py-10 sm:p-[60px]">
                 <h3 className="mb-3 text-center text-2xl font-bold text-black sm:text-3xl dark:text-white">
-                  Create your account
+                  Sign in to your account
                 </h3>
-                <div className="mb-8 flex items-center justify-center">
-                  <span className="bg-body-color/50 hidden h-[1px] w-full max-w-[60px] sm:block"></span>
-                  <p className="text-body-color w-full px-5 text-center text-base font-medium">
-                    Register
-                  </p>
-                  <span className="bg-body-color/50 hidden h-[1px] w-full max-w-[60px] sm:block"></span>
-                </div>
-
                 {error && (
                   <p className="mb-4 text-center text-sm text-red-500">
                     {error}
-                  </p>
-                )}
-                {success && (
-                  <p className="mb-4 text-center text-sm text-green-500">
-                    {success}
                   </p>
                 )}
 
@@ -102,12 +90,12 @@ const SignupPage = () => {
                       htmlFor="userid"
                       className="text-dark mb-3 block text-sm dark:text-white"
                     >
-                      userid
+                      Username
                     </label>
                     <input
                       type="text"
                       name="userid"
-                      placeholder="userid"
+                      placeholder="Username"
                       value={formData.userid}
                       onChange={handleChange}
                       required
@@ -131,21 +119,72 @@ const SignupPage = () => {
                       className="border-stroke dark:text-body-color-dark dark:shadow-two text-body-color focus:border-primary dark:focus:border-primary w-full rounded-xs border bg-[#f8f8f8] px-6 py-3 text-base outline-hidden transition-all duration-300 dark:border-transparent dark:bg-[#2C303B] dark:focus:shadow-none"
                     />
                   </div>
-
+                  <div className="mb-8 flex flex-col justify-between sm:flex-row sm:items-center">
+                    <div className="mb-4 sm:mb-0">
+                      <label
+                        htmlFor="rememberMe"
+                        className="text-body-color flex cursor-pointer items-center text-sm font-medium select-none"
+                      >
+                        <div className="relative">
+                          <input
+                            type="checkbox"
+                            id="rememberMe"
+                            name="rememberMe"
+                            checked={formData.rememberMe}
+                            onChange={handleChange}
+                            className="sr-only"
+                          />
+                          <div className="box border-body-color/20 mr-4 flex h-5 w-5 items-center justify-center rounded-sm border dark:border-white/10">
+                            <span
+                              className={
+                                formData.rememberMe
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              }
+                            >
+                              <svg
+                                width="11"
+                                height="8"
+                                viewBox="0 0 11 8"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <path
+                                  d="M10.0915 0.951972L10.0867 0.946075L10.0813 0.940568C9.90076 0.753564 9.61034 0.753146 9.42927 0.939309L4.16201 6.22962L1.58507 3.63469C1.40401 3.44841 1.11351 3.44879 0.932892 3.63584C0.755703 3.81933 0.755703 4.10875 0.932892 4.29224L0.932878 4.29225L0.934851 4.29424L3.58046 6.95832C3.73676 7.11955 3.94983 7.2 4.1473 7.2C4.36196 7.2 4.55963 7.11773 4.71406 6.9584L10.0468 1.60234C10.2436 1.4199 10.2421 1.1339 10.0915 0.951972ZM4.2327 6.30081L4.2317 6.2998C4.23206 6.30015 4.23237 6.30049 4.23269 6.30082L4.2327 6.30081Z"
+                                  fill="#3056D3"
+                                  stroke="#3056D3"
+                                  strokeWidth="0.4"
+                                />
+                              </svg>
+                            </span>
+                          </div>
+                        </div>
+                        Keep me signed in
+                      </label>
+                    </div>
+                    <div>
+                      <a
+                        href="#0"
+                        className="text-primary text-sm font-medium hover:underline"
+                      >
+                        Forgot Password?
+                      </a>
+                    </div>
+                  </div>
                   <div className="mb-6">
                     <button
                       type="submit"
                       disabled={loading}
                       className="shadow-submit dark:shadow-submit-dark bg-primary hover:bg-primary/90 flex w-full items-center justify-center rounded-xs px-9 py-4 text-base font-medium text-white duration-300 disabled:opacity-50"
                     >
-                      {loading ? "Processing..." : "Sign up"}
+                      {loading ? "Authenticating..." : "Sign in"}
                     </button>
                   </div>
                 </form>
                 <p className="text-body-color text-center text-base font-medium">
-                  Already using Startup?{" "}
-                  <Link href="/signin" className="text-primary hover:underline">
-                    Sign in
+                  No account?
+                  <Link href="/signup" className="text-primary hover:underline">
+                    Sign up
                   </Link>
                 </p>
               </div>
@@ -214,4 +253,4 @@ const SignupPage = () => {
   );
 };
 
-export default SignupPage;
+export default SigninPage;

@@ -69,7 +69,7 @@ jobs:
           key: ${{ secrets.EC2_API_SSH_KEY }}
           proxy_host: ${{ secrets.EC2_HOST }}
           proxy_username: ${{ secrets.EC2_USER }}
-          proxy_key: ${{ secrets.EC2_API_SSH_KEY }}
+          proxy_key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             echo "Deploying on Private Server..."
 

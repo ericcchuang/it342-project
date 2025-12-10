@@ -49,9 +49,15 @@ jobs:
                 curl -O https://nodejs.org/dist/$NODE_VERSION/$NODE_DIST.tar.xz
             fi
 
-            echo "Downloading latest PM2..."
-            rm -f pm2-*.tgz # Remove old versions
-            npm pack pm2
+            echo "Building offline PM2 bundle..."
+            rm -rf pm2-build
+            mkdir -p pm2-build
+            cd pm2-build
+            # --global-style forces all dependencies to be nested INSIDE the pm2 folder
+            npm install --global-style pm2
+            # Zip the fully hydrated folder
+            tar -czf ~/offline-tools/pm2-complete.tar.gz -C node_modules pm2
+            cd ..
 
             echo "--- BUILDING APP ---"
             cd ~/build-stage/api
@@ -77,7 +83,7 @@ jobs:
 
             scp -o StrictHostKeyChecking=no -i ~/deploy_key.pem ~/offline-tools/$NODE_DIST.tar.xz ${{ secrets.EC2_USER }}@${{ secrets.EC2_API_HOST }}:/home/${{ secrets.EC2_USER }}/node-binary.tar.xz
 
-            scp -o StrictHostKeyChecking=no -i ~/deploy_key.pem ~/offline-tools/pm2-*.tgz ${{ secrets.EC2_USER }}@${{ secrets.EC2_API_HOST }}:/home/${{ secrets.EC2_USER }}/pm2-offline.tgz
+            scp -o StrictHostKeyChecking=no -i ~/deploy_key.pem ~/offline-tools/pm2-complete.tar.gz ${{ secrets.EC2_USER }}@${{ secrets.EC2_API_HOST }}:/home/${{ secrets.EC2_USER }}/pm2-complete.tar.gz
 
             scp -o StrictHostKeyChecking=no -i ~/deploy_key.pem backend-deploy.tar.gz ${{ secrets.EC2_USER }}@${{ secrets.EC2_API_HOST }}:/home/${{ secrets.EC2_USER }}/backend-deploy.tar.gz
 
@@ -96,9 +102,7 @@ jobs:
             echo "--- INSTALLING NODE.JS (Offline) ---"
 
             sudo mkdir -p /usr/local/lib/nodejs
-
             sudo tar -xJf ~/node-binary.tar.xz -C /usr/local/lib/nodejs
-
             NODE_DIR=$(ls -d /usr/local/lib/nodejs/node-v*-linux-x64 | head -n 1)
 
             sudo ln -sf $NODE_DIR/bin/node /usr/bin/node
@@ -108,15 +112,13 @@ jobs:
             echo "Node Version: $(node -v)"
 
             echo "--- INSTALLING PM2 (Offline) ---"
-            # Install PM2 globally from the file we uploaded
-            sudo npm install -g ~/pm2-offline.tgz
+            sudo tar -xzf ~/pm2-complete.tar.gz -C $NODE_DIR/lib/node_modules/
 
             sudo ln -sf $NODE_DIR/lib/node_modules/pm2/bin/pm2 /usr/bin/pm2
 
             echo "PM2 Version: $(pm2 -v)"
 
             echo "--- DEPLOYING APP ---"
-            # 1. Clean old folder
             rm -rf ~/spiderweb-api
             mkdir -p ~/spiderweb-api
 
@@ -129,4 +131,4 @@ jobs:
 
             echo "Deployment Successful!"
 
-            rm ~/node-binary.tar.xz ~/pm2-offline.tgz ~/backend-deploy.tar.gz
+            rm ~/node-binary.tar.xz ~/pm2-complete.tar.gz ~/backend-deploy.tar.gz

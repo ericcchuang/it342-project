@@ -1,0 +1,166 @@
+name: Deploy Backend (Offline Mode)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "api/**"
+      - ".github/workflows/upload-api-aws.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_SG_ID: ${{ secrets.FRONTEND_SG_ID }}
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get Runner IP Address
+        id: ip
+        run: echo "ipv4=$(curl -s https://checkip.amazonaws.com)" >> $GITHUB_OUTPUT
+
+      - name: Whitelist Runner IP (Allow SSH Ingress on Port 22)
+        run: |
+          aws ec2 authorize-security-group-ingress \
+            --group-id ${{ env.AWS_SG_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.ip.outputs.ipv4 }}/32
+        env:
+          RUNNER_IP: ${{ steps.ip.outputs.ipv4 }}
+
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Copy Source to Public EC2
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "api/*"
+          target: "/home/${{ secrets.EC2_USER }}/build-stage"
+          rm: true
+
+      - name: Prepare Offline Tools & App
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            echo "${{ secrets.EC2_API_SSH_KEY }}" > deploy_key.pem
+            chmod 600 deploy_key.pem
+
+            NODE_VERSION="v20.12.2"
+            NODE_DIST="node-$NODE_VERSION-linux-x64"
+
+            echo "--- PREPARING OFFLINE TOOLS ---"
+            mkdir -p ~/offline-tools
+            cd ~/offline-tools
+
+            if [ ! -f "$NODE_DIST.tar.xz" ]; then
+                echo "Downloading Node.js $NODE_VERSION..."
+                curl -O https://nodejs.org/dist/$NODE_VERSION/$NODE_DIST.tar.xz
+            fi
+
+            echo "Building offline PM2 bundle..."
+            rm -rf pm2-build
+            mkdir -p pm2-build
+            cd pm2-build
+            # --global-style forces all dependencies to be nested INSIDE the pm2 folder
+            npm install --global-style pm2
+            # Zip the fully hydrated folder
+            tar -czf ~/offline-tools/pm2-complete.tar.gz -C node_modules pm2
+            cd ..
+
+            echo "--- BUILDING APP ---"
+            cd ~/build-stage/api
+
+            echo "Generating .env file..."
+            echo "NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}" > .env.local
+            echo "NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}" >> .env.local
+            echo "NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}" >> .env.local
+            echo "PG_HOST=${{ secrets.PG_HOST }}" >> .env.local
+            echo "PG_USER=${{ secrets.PG_USER }}" >> .env.local
+            echo "PG_PASSWORD=${{ secrets.PG_PASSWORD }}" >> .env.local
+            echo "PG_DATABASE=postgres" >> .env.local
+            echo "PG_PORT=5432" >> .env.local
+
+            echo "Installing dependencies..."
+            npm ci --omit=dev
+
+            echo "Zipping application..."
+            cd ..
+            tar -czf backend-deploy.tar.gz api
+
+            echo "--- TRANSFERRING TO PRIVATE EC2 ---"
+
+            scp -o StrictHostKeyChecking=no -i ~/deploy_key.pem ~/offline-tools/$NODE_DIST.tar.xz ${{ secrets.EC2_USER }}@${{ secrets.EC2_API_HOST }}:/home/${{ secrets.EC2_USER }}/node-binary.tar.xz
+
+            scp -o StrictHostKeyChecking=no -i ~/deploy_key.pem ~/offline-tools/pm2-complete.tar.gz ${{ secrets.EC2_USER }}@${{ secrets.EC2_API_HOST }}:/home/${{ secrets.EC2_USER }}/pm2-complete.tar.gz
+
+            scp -o StrictHostKeyChecking=no -i ~/deploy_key.pem backend-deploy.tar.gz ${{ secrets.EC2_USER }}@${{ secrets.EC2_API_HOST }}:/home/${{ secrets.EC2_USER }}/backend-deploy.tar.gz
+
+            rm ~/deploy_key.pem
+
+      - name: Install & Deploy on Private EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_API_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_API_SSH_KEY }}
+          proxy_host: ${{ secrets.EC2_HOST }}
+          proxy_username: ${{ secrets.EC2_USER }}
+          proxy_key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            echo "--- INSTALLING NODE.JS (Offline) ---"
+
+            sudo mkdir -p /usr/local/lib/nodejs
+            sudo tar -xJf ~/node-binary.tar.xz -C /usr/local/lib/nodejs
+            NODE_DIR=$(ls -d /usr/local/lib/nodejs/node-v*-linux-x64 | head -n 1)
+
+            sudo ln -sf $NODE_DIR/bin/node /usr/bin/node
+            sudo ln -sf $NODE_DIR/bin/npm /usr/bin/npm
+            sudo ln -sf $NODE_DIR/bin/npx /usr/bin/npx
+
+            echo "Node Version: $(node -v)"
+
+            echo "--- INSTALLING PM2 (Offline) ---"
+            sudo tar -xzf ~/pm2-complete.tar.gz -C $NODE_DIR/lib/node_modules/
+
+            sudo ln -sf $NODE_DIR/lib/node_modules/pm2/bin/pm2 /usr/bin/pm2
+
+            echo "PM2 Version: $(pm2 -v)"
+
+            echo "--- DEPLOYING APP ---"
+            rm -rf ~/spiderweb-api
+            mkdir -p ~/spiderweb-api
+
+            tar -xzf ~/backend-deploy.tar.gz -C ~/spiderweb-api
+
+            cd ~/spiderweb-api/api
+
+            pm2 reload ecosystem.config.cjs --update-env --env production || pm2 start ecosystem.config.cjs --env production
+            pm2 save
+
+            echo "Deployment Successful!"
+
+            rm ~/node-binary.tar.xz ~/pm2-complete.tar.gz ~/backend-deploy.tar.gz
+
+      - name: Revoke Runner IP Address (Cleanup)
+        if: always()
+        run: |
+          aws ec2 revoke-security-group-ingress \
+            --group-id ${{ env.AWS_SG_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.ip.outputs.ipv4 }}/32

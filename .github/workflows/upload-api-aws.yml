@@ -87,14 +87,14 @@ jobs:
             cd ~/build-stage/api
 
             echo "Generating .env file..."
-            echo "NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}" > .env
-            echo "NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}" >> .env
-            echo "NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}" >> .env
-            echo "PG_HOST=${{ secrets.PG_HOST }}" >> .env
-            echo "PG_USER=${{ secrets.PG_USER }}" >> .env
-            echo "PG_PASSWORD=${{ secrets.PG_PASSWORD }}" >> .env
-            echo "PG_DATABASE=postgres" >> .env
-            echo "PG_PORT=5432" >> .env
+            echo "NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}" > .env.local
+            echo "NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}" >> .env.local
+            echo "NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}" >> .env.local
+            echo "PG_HOST=${{ secrets.PG_HOST }}" >> .env.local
+            echo "PG_USER=${{ secrets.PG_USER }}" >> .env.local
+            echo "PG_PASSWORD=${{ secrets.PG_PASSWORD }}" >> .env.local
+            echo "PG_DATABASE=postgres" >> .env.local
+            echo "PG_PORT=5432" >> .env.local
 
             echo "Installing dependencies..."
             npm ci --omit=dev

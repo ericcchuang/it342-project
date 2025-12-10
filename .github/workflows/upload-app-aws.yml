@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - refactoring
     paths:
       - "app/**"
       - ".github/workflows/upload-app-aws.yml"

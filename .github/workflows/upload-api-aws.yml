@@ -57,7 +57,7 @@ jobs:
             tar -czf backend-deploy.tar.gz api
 
             echo "Copying to Private EC2..."
-            scp -o StrictHostKeyChecking=no -i ~/deploy_key.pem backend-deploy.tar.gz ${{ secrets.EC2_USER }}@${{ secrets.EC2_API_HOST }}:~/
+            scp -o StrictHostKeyChecking=no -i ~/deploy_key.pem backend-deploy.tar.gz ${{ secrets.EC2_USER }}@${{ secrets.EC2_API_HOST }}:/home/${{ secrets.EC2_USER }}/backend-deploy.tar.gz
 
             rm ~/deploy_key.pem
 
@@ -73,13 +73,27 @@ jobs:
           script: |
             echo "Deploying on Private Server..."
 
-            rm -rf ~/spiderweb-api
-            mkdir -p ~/spiderweb-api
+            PM2_CMD=/usr/local/bin/pm2 
 
-            tar -xzf ~/backend-deploy.tar.gz -C ~/spiderweb-api
-
-            cd ~/spiderweb-api/api
-            pm2 reload ecosystem.config.js --update-env --env production || pm2 start ecosystem.config.js --env production
-            pm2 save
-
-            echo "Deployment Complete!"
+            if [ -f "/home/${{ secrets.EC2_USER }}/backend-deploy.tar.gz" ]; then
+              echo "File found. Extracting..."
+              
+              rm -rf ~/spiderweb-api
+              mkdir -p ~/spiderweb-api
+              
+              # FIX 3: Unzip explicitly from the full path
+              tar -xzf /home/${{ secrets.EC2_USER }}/backend-deploy.tar.gz -C ~/spiderweb-api
+              
+              cd ~/spiderweb-api/api
+              
+              echo "Starting PM2..."
+              $PM2_CMD reload ecosystem.config.js --update-env --env production || $PM2_CMD start ecosystem.config.js --env production
+              $PM2_CMD save
+              
+              echo "Cleaning up..."
+              rm /home/${{ secrets.EC2_USER }}/backend-deploy.tar.gz
+            else
+              echo "ERROR: /home/${{ secrets.EC2_USER }}/backend-deploy.tar.gz NOT FOUND"
+              ls -l /home/${{ secrets.EC2_USER }}/
+              exit 1
+            fi

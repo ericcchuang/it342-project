@@ -12,6 +12,9 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_SG_ID: ${{ secrets.FRONTEND_SG_ID }}
 
     steps:
       - name: Configure AWS Credentials

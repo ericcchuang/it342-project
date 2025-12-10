@@ -34,7 +34,7 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            echo "${{ secrets.EC2_SSH_KEY }}" > deploy_key.pem
+            echo "${{ secrets.EC2_API_SSH_KEY }}" > deploy_key.pem
             chmod 600 deploy_key.pem
 
             cd ~/build-stage/api

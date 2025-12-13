@@ -1,0 +1,21 @@
+{
+  "name": "it342-project",
+  "version": "1.0.0",
+  "description": "Startup is a free, open-source, and premium-quality [**Next.js startup website template**](https://nextjstemplates.com/templates/startup) that comes with everything you need to launch a startup, business, or SaaS website, including all essential sections, components, and pages.",
+  "keywords": [],
+  "homepage": "https://github.com/ericcchuang/it342-project#readme",
+  "bugs": {
+    "url": "https://github.com/ericcchuang/it342-project/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ericcchuang/it342-project.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}

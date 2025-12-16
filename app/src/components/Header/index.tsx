@@ -1,19 +1,59 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import ThemeToggler from "./ThemeToggler";
 import menuData from "./menuData";
 
 const Header = () => {
-  // Navbar toggle
+  const [user, setUser] = useState(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const checkLogin = async () => {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/auth/me`,
+          {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+          },
+        );
+        const data = await res.json();
+        if (data.isAuthenticated) {
+          setUser(data.user);
+        }
+      } catch (err) {
+        console.error("Auth check failed", err);
+      }
+    };
+
+    checkLogin();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/auth/signout`,
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
+      setUser(null);
+      router.push("/");
+    } catch (err) {
+      console.error("Logout failed", err);
+    }
+  };
+
   const [navbarOpen, setNavbarOpen] = useState(false);
   const navbarToggleHandler = () => {
     setNavbarOpen(!navbarOpen);
   };
 
-  // Sticky Navbar
   const [sticky, setSticky] = useState(false);
   const handleStickyNavbar = () => {
     if (window.scrollY >= 80) {
@@ -26,7 +66,6 @@ const Header = () => {
     window.addEventListener("scroll", handleStickyNavbar);
   });
 
-  // submenu handler
   const [openIndex, setOpenIndex] = useState(-1);
   const handleSubmenu = (index) => {
     if (openIndex === index) {
@@ -158,19 +197,37 @@ const Header = () => {
                   </ul>
                 </nav>
               </div>
+
               <div className="flex items-center justify-end pr-16 lg:pr-0">
-                <Link
-                  href="/signin"
-                  className="text-dark hidden px-7 py-3 text-base font-medium hover:opacity-70 md:block dark:text-white"
-                >
-                  Sign In
-                </Link>
-                <Link
-                  href="/signup"
-                  className="ease-in-up shadow-btn hover:shadow-btn-hover bg-primary hover:bg-primary/90 hidden rounded-xs px-8 py-3 text-base font-medium text-white transition duration-300 md:block md:px-9 lg:px-6 xl:px-9"
-                >
-                  Sign Up
-                </Link>
+                {!user ? (
+                  <>
+                    <Link
+                      href="/signin"
+                      className="text-dark hidden px-7 py-3 text-base font-medium hover:opacity-70 md:block dark:text-white"
+                    >
+                      Sign In
+                    </Link>
+                    <Link
+                      href="/signup"
+                      className="ease-in-up shadow-btn hover:shadow-btn-hover bg-primary hover:bg-primary/90 hidden rounded-xs px-8 py-3 text-base font-medium text-white transition duration-300 md:block md:px-9 lg:px-6 xl:px-9"
+                    >
+                      Sign Up
+                    </Link>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-4">
+                    <span className="text-dark hidden text-base font-medium md:block dark:text-white">
+                      Hi, {user.id}
+                    </span>
+                    <button
+                      onClick={handleLogout}
+                      className="ease-in-up shadow-btn hover:shadow-btn-hover bg-primary hover:bg-primary/90 hidden rounded-xs px-8 py-3 text-base font-medium text-white transition duration-300 md:block md:px-9 lg:px-6 xl:px-9"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                )}
+
                 <div>
                   <ThemeToggler />
                 </div>

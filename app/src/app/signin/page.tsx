@@ -45,6 +45,7 @@ const SigninPage = () => {
           userid: formData.userid,
           password: formData.password,
         }),
+        credentials: "include",
       });
 
       const data = await response.json();
@@ -54,12 +55,11 @@ const SigninPage = () => {
         localStorage.setItem("authToken", token);
         console.log("Login successful.");
         setError(null);
-        router.push("/blog");
+        window.location.href = "/";
       } else {
         console.error("Authentication failed:", data.message);
         setError(data.message || "Invalid username or password.");
       }
-      // --- End New Authentication Logic ---
     } catch (e) {
       console.error("Network or server error during sign-in:", e);
       setError("A network error occurred.");

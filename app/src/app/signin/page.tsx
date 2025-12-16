@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 const SigninPage = () => {
   const router = useRouter();
@@ -17,6 +18,8 @@ const SigninPage = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/";
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value =
@@ -45,6 +48,7 @@ const SigninPage = () => {
           userid: formData.userid,
           password: formData.password,
         }),
+        credentials: "include",
       });
 
       const data = await response.json();
@@ -54,12 +58,11 @@ const SigninPage = () => {
         localStorage.setItem("authToken", token);
         console.log("Login successful.");
         setError(null);
-        router.push("/blog");
+        window.location.href = callbackUrl;
       } else {
         console.error("Authentication failed:", data.message);
         setError(data.message || "Invalid username or password.");
       }
-      // --- End New Authentication Logic ---
     } catch (e) {
       console.error("Network or server error during sign-in:", e);
       setError("A network error occurred.");

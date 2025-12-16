@@ -9,6 +9,7 @@ import menuData from "./menuData";
 const Header = () => {
   const [user, setUser] = useState(null);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     const checkLogin = async () => {
@@ -76,6 +77,7 @@ const Header = () => {
   };
 
   const usePathName = usePathname();
+  const redirectUrl = pathname.includes("sign") ? "/" : pathname;
 
   return (
     <>
@@ -202,7 +204,7 @@ const Header = () => {
                 {!user ? (
                   <>
                     <Link
-                      href="/signin"
+                      href={`/signin?callbackUrl=${encodeURIComponent(redirectUrl)}`}
                       className="text-dark hidden px-7 py-3 text-base font-medium hover:opacity-70 md:block dark:text-white"
                     >
                       Sign In

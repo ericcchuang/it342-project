@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 const SigninPage = () => {
   const router = useRouter();
@@ -17,6 +18,8 @@ const SigninPage = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/";
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value =
@@ -55,7 +58,7 @@ const SigninPage = () => {
         localStorage.setItem("authToken", token);
         console.log("Login successful.");
         setError(null);
-        window.location.href = "/";
+        window.location.href = callbackUrl;
       } else {
         console.error("Authentication failed:", data.message);
         setError(data.message || "Invalid username or password.");

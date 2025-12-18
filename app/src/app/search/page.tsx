@@ -115,7 +115,7 @@ export default async function SearchPage(props: SearchPageProps) {
   if (showUsers && queryRaw.trim() !== "") {
     try {
       const apiBase = getApiBaseUrl();
-      const url = `${apiBase}/api/search/users?q=${encodeURIComponent(queryRaw.trim())}`;
+      const url = `${apiBase}/search/users?q=${encodeURIComponent(queryRaw.trim())}`;
 
       const resp = await fetch(url, {
         cache: "no-store",

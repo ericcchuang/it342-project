@@ -92,6 +92,9 @@ jobs:
 
             npm ci --omit=dev
 
+            cp -r public .next/standalone/
+            cp -r .next/static .next/standalone/.next/
+
             set -a
             source prod.env
             set +a

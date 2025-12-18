@@ -1,20 +1,12 @@
+"use client";
+
 import Breadcrumb from "@/components/Common/Breadcrumb";
 import SingleBlog from "@/components/search/SingleBlog";
 import blogData from "@/components/search/blogData";
-import { Metadata } from "next";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
 
-export const metadata: Metadata = {
-  title: "Search",
-  description: "Search blogs, courses, and users",
-};
-
-type SearchPageProps = {
-  searchParams: Promise<{
-    q?: string;
-    type?: string; // all | blogs | courses | users
-  }>;
-};
-
+// Types
 type Course = {
   id: number;
   title: string;
@@ -65,21 +57,20 @@ const courses: Course[] = [
   },
 ];
 
-function getApiBaseUrl() {
-  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-}
+const SearchContent = () => {
+  const searchParams = useSearchParams();
+  const queryRaw = searchParams.get("q") || "";
+  const typeRaw = (searchParams.get("type") || "all").toLowerCase();
 
-export default async function SearchPage(props: SearchPageProps) {
-  const searchParams = await props.searchParams;
-
-  const queryRaw = searchParams.q || "";
   const query = queryRaw.toLowerCase();
+  const type = ["blogs", "courses", "users"].includes(typeRaw)
+    ? typeRaw
+    : "all";
 
-  const typeRaw = (searchParams.type || "all").toLowerCase();
-  const type =
-    typeRaw === "blogs" || typeRaw === "courses" || typeRaw === "users"
-      ? typeRaw
-      : "all";
+  // State for async user results
+  const [userResults, setUserResults] = useState<UserResult[]>([]);
+  const [userSearchError, setUserSearchError] = useState("");
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
   const filteredBlogs =
     query === ""
@@ -93,44 +84,49 @@ export default async function SearchPage(props: SearchPageProps) {
   const filteredCourses =
     query === ""
       ? courses
-      : courses.filter((c) => {
-          const text = (
-            c.title +
-            " " +
-            c.category +
-            " " +
-            c.description
-          ).toLowerCase();
-          return text.includes(query);
-        });
+      : courses.filter((c) =>
+          (c.title + " " + c.category + " " + c.description)
+            .toLowerCase()
+            .includes(query),
+        );
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (type !== "all" && type !== "users") return;
+      if (!queryRaw.trim()) {
+        setUserResults([]);
+        return;
+      }
+
+      setLoadingUsers(true);
+      setUserSearchError("");
+
+      try {
+        const apiBase =
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        const res = await fetch(
+          `${apiBase}/search/users?q=${encodeURIComponent(queryRaw.trim())}`,
+        );
+
+        if (!res.ok) {
+          setUserSearchError(`User search failed (${res.status})`);
+        } else {
+          const data = await res.json();
+          setUserResults(Array.isArray(data.results) ? data.results : []);
+        }
+      } catch (err) {
+        setUserSearchError("User search failed (network error)");
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+
+    fetchUsers();
+  }, [queryRaw, type]);
 
   const showBlogs = type === "all" || type === "blogs";
   const showCourses = type === "all" || type === "courses";
   const showUsers = type === "all" || type === "users";
-
-  // Backend user search
-  let userResults: UserResult[] = [];
-  let userSearchError = "";
-
-  if (showUsers && queryRaw.trim() !== "") {
-    try {
-      const apiBase = getApiBaseUrl();
-      const url = `${apiBase}/search/users?q=${encodeURIComponent(queryRaw.trim())}`;
-
-      const resp = await fetch(url, {
-        cache: "no-store",
-      });
-
-      if (!resp.ok) {
-        userSearchError = `User search failed (${resp.status})`;
-      } else {
-        const data = (await resp.json()) as { results?: UserResult[] };
-        userResults = Array.isArray(data.results) ? data.results : [];
-      }
-    } catch (e: any) {
-      userSearchError = "User search failed (network error)";
-    }
-  }
 
   const nothingFound =
     (showBlogs ? filteredBlogs.length === 0 : true) &&
@@ -138,7 +134,7 @@ export default async function SearchPage(props: SearchPageProps) {
     (showUsers
       ? queryRaw.trim() === ""
         ? false
-        : userResults.length === 0
+        : userResults.length === 0 && !loadingUsers
       : true);
 
   return (
@@ -150,18 +146,14 @@ export default async function SearchPage(props: SearchPageProps) {
 
       <section className="pt-[120px] pb-[120px]">
         <div className="container">
-          <form
-            method="GET"
-            className="mb-10 flex flex-wrap items-center justify-center gap-3"
-          >
+          <form className="mb-10 flex flex-wrap items-center justify-center gap-3">
             <input
               type="text"
               name="q"
               defaultValue={queryRaw}
-              placeholder="Search blogs, courses, or users..."
+              placeholder="Search..."
               className="border-stroke focus:border-primary w-full max-w-md rounded-md border bg-transparent px-4 py-2 text-base outline-none"
             />
-
             <select
               name="type"
               defaultValue={type}
@@ -172,7 +164,6 @@ export default async function SearchPage(props: SearchPageProps) {
               <option value="courses">Courses</option>
               <option value="users">Users</option>
             </select>
-
             <button
               type="submit"
               className="bg-primary rounded-md px-4 py-2 text-sm text-white"
@@ -189,7 +180,6 @@ export default async function SearchPage(props: SearchPageProps) {
                   {filteredBlogs.length} found
                 </span>
               </div>
-
               <div className="-mx-4 flex flex-wrap justify-center">
                 {filteredBlogs.map((blog: any) => (
                   <div
@@ -199,7 +189,6 @@ export default async function SearchPage(props: SearchPageProps) {
                     <SingleBlog blog={blog} />
                   </div>
                 ))}
-
                 {filteredBlogs.length === 0 && (
                   <p className="text-body-color mt-2 text-center">
                     No blog results.
@@ -217,7 +206,6 @@ export default async function SearchPage(props: SearchPageProps) {
                   {filteredCourses.length} found
                 </span>
               </div>
-
               <div className="-mx-4 flex flex-wrap justify-center">
                 {filteredCourses.map((course) => (
                   <div
@@ -245,7 +233,6 @@ export default async function SearchPage(props: SearchPageProps) {
                     </div>
                   </div>
                 ))}
-
                 {filteredCourses.length === 0 && (
                   <p className="text-body-color mt-2 text-center">
                     No course results.
@@ -270,13 +257,17 @@ export default async function SearchPage(props: SearchPageProps) {
                 </p>
               )}
 
-              {queryRaw.trim() !== "" && userSearchError && (
+              {loadingUsers && (
+                <p className="text-body-color mt-2 text-center">Loading...</p>
+              )}
+
+              {userSearchError && (
                 <p className="text-body-color mt-2 text-center">
                   {userSearchError}
                 </p>
               )}
 
-              {queryRaw.trim() !== "" && !userSearchError && (
+              {!loadingUsers && !userSearchError && queryRaw.trim() !== "" && (
                 <div className="-mx-4 flex flex-wrap justify-center">
                   {userResults.map((u) => (
                     <div
@@ -288,7 +279,6 @@ export default async function SearchPage(props: SearchPageProps) {
                       </div>
                     </div>
                   ))}
-
                   {userResults.length === 0 && (
                     <p className="text-body-color mt-2 text-center">
                       No user results.
@@ -307,5 +297,13 @@ export default async function SearchPage(props: SearchPageProps) {
         </div>
       </section>
     </>
+  );
+};
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<div>Loading search...</div>}>
+      <SearchContent />
+    </Suspense>
   );
 }

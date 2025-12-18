@@ -9,10 +9,10 @@ export const metadata: Metadata = {
 };
 
 type SearchPageProps = {
-  searchParams?: {
+  searchParams: Promise<{
     q?: string;
     type?: string; // all | blogs | courses | users
-  };
+  }>;
 };
 
 type Course = {
@@ -66,16 +66,16 @@ const courses: Course[] = [
 ];
 
 function getApiBaseUrl() {
-  // If you set NEXT_PUBLIC_API_BASE_URL in .env.local (frontend), it will use that.
-  // Otherwise it falls back to localhost for dev.
   return process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001";
 }
 
-export default async function SearchPage({ searchParams }: SearchPageProps) {
-  const queryRaw = searchParams?.q || "";
+export default async function SearchPage(props: SearchPageProps) {
+  const searchParams = await props.searchParams;
+
+  const queryRaw = searchParams.q || "";
   const query = queryRaw.toLowerCase();
 
-  const typeRaw = (searchParams?.type || "all").toLowerCase();
+  const typeRaw = (searchParams.type || "all").toLowerCase();
   const type =
     typeRaw === "blogs" || typeRaw === "courses" || typeRaw === "users"
       ? typeRaw
@@ -85,14 +85,22 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     query === ""
       ? blogData
       : blogData.filter((blog: any) =>
-          String(blog.title || "").toLowerCase().includes(query)
+          String(blog.title || "")
+            .toLowerCase()
+            .includes(query),
         );
 
   const filteredCourses =
     query === ""
       ? courses
       : courses.filter((c) => {
-          const text = (c.title + " " + c.category + " " + c.description).toLowerCase();
+          const text = (
+            c.title +
+            " " +
+            c.category +
+            " " +
+            c.description
+          ).toLowerCase();
           return text.includes(query);
         });
 
@@ -127,11 +135,18 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const nothingFound =
     (showBlogs ? filteredBlogs.length === 0 : true) &&
     (showCourses ? filteredCourses.length === 0 : true) &&
-    (showUsers ? (queryRaw.trim() === "" ? false : userResults.length === 0) : true);
+    (showUsers
+      ? queryRaw.trim() === ""
+        ? false
+        : userResults.length === 0
+      : true);
 
   return (
     <>
-      <Breadcrumb pageName="Search" description="Search blogs, courses, and users." />
+      <Breadcrumb
+        pageName="Search"
+        description="Search blogs, courses, and users."
+      />
 
       <section className="pt-[120px] pb-[120px]">
         <div className="container">
@@ -144,13 +159,13 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
               name="q"
               defaultValue={queryRaw}
               placeholder="Search blogs, courses, or users..."
-              className="w-full max-w-md rounded-md border border-stroke bg-transparent px-4 py-2 text-base outline-none focus:border-primary"
+              className="border-stroke focus:border-primary w-full max-w-md rounded-md border bg-transparent px-4 py-2 text-base outline-none"
             />
 
             <select
               name="type"
               defaultValue={type}
-              className="rounded-md border border-stroke bg-transparent px-3 py-2 text-base outline-none focus:border-primary"
+              className="border-stroke focus:border-primary rounded-md border bg-transparent px-3 py-2 text-base outline-none"
             >
               <option value="all">All</option>
               <option value="blogs">Blogs</option>
@@ -160,7 +175,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
             <button
               type="submit"
-              className="rounded-md bg-primary px-4 py-2 text-sm text-white"
+              className="bg-primary rounded-md px-4 py-2 text-sm text-white"
             >
               Search
             </button>
@@ -170,7 +185,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             <>
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-xl font-semibold">Blog results</h2>
-                <span className="text-sm text-body-color">{filteredBlogs.length} found</span>
+                <span className="text-body-color text-sm">
+                  {filteredBlogs.length} found
+                </span>
               </div>
 
               <div className="-mx-4 flex flex-wrap justify-center">
@@ -184,7 +201,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                 ))}
 
                 {filteredBlogs.length === 0 && (
-                  <p className="mt-2 text-center text-body-color">No blog results.</p>
+                  <p className="text-body-color mt-2 text-center">
+                    No blog results.
+                  </p>
                 )}
               </div>
             </>
@@ -194,7 +213,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             <>
               <div className="mt-14 mb-4 flex items-center justify-between">
                 <h2 className="text-xl font-semibold">Course results</h2>
-                <span className="text-sm text-body-color">{filteredCourses.length} found</span>
+                <span className="text-body-color text-sm">
+                  {filteredCourses.length} found
+                </span>
               </div>
 
               <div className="-mx-4 flex flex-wrap justify-center">
@@ -203,10 +224,16 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                     key={course.id}
                     className="w-full px-4 md:w-2/3 lg:w-1/2 xl:w-1/3"
                   >
-                    <div className="rounded-md border border-stroke p-6">
-                      <h3 className="mb-2 text-lg font-semibold">{course.title}</h3>
-                      <p className="mb-2 text-xs text-body-color">{course.category}</p>
-                      <p className="mb-4 text-sm text-body-color">{course.description}</p>
+                    <div className="border-stroke rounded-md border p-6">
+                      <h3 className="mb-2 text-lg font-semibold">
+                        {course.title}
+                      </h3>
+                      <p className="text-body-color mb-2 text-xs">
+                        {course.category}
+                      </p>
+                      <p className="text-body-color mb-4 text-sm">
+                        {course.description}
+                      </p>
                       <a
                         href={course.url}
                         target="_blank"
@@ -220,7 +247,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                 ))}
 
                 {filteredCourses.length === 0 && (
-                  <p className="mt-2 text-center text-body-color">No course results.</p>
+                  <p className="text-body-color mt-2 text-center">
+                    No course results.
+                  </p>
                 )}
               </div>
             </>
@@ -230,17 +259,21 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             <>
               <div className="mt-14 mb-4 flex items-center justify-between">
                 <h2 className="text-xl font-semibold">User results</h2>
-                <span className="text-sm text-body-color">{userResults.length} found</span>
+                <span className="text-body-color text-sm">
+                  {userResults.length} found
+                </span>
               </div>
 
               {queryRaw.trim() === "" && (
-                <p className="mt-2 text-center text-body-color">
+                <p className="text-body-color mt-2 text-center">
                   Type a username to search users.
                 </p>
               )}
 
               {queryRaw.trim() !== "" && userSearchError && (
-                <p className="mt-2 text-center text-body-color">{userSearchError}</p>
+                <p className="text-body-color mt-2 text-center">
+                  {userSearchError}
+                </p>
               )}
 
               {queryRaw.trim() !== "" && !userSearchError && (
@@ -250,14 +283,16 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                       key={u.userid}
                       className="w-full px-4 md:w-2/3 lg:w-1/2 xl:w-1/3"
                     >
-                      <div className="rounded-md border border-stroke p-6">
+                      <div className="border-stroke rounded-md border p-6">
                         <h3 className="text-lg font-semibold">{u.userid}</h3>
                       </div>
                     </div>
                   ))}
 
                   {userResults.length === 0 && (
-                    <p className="mt-2 text-center text-body-color">No user results.</p>
+                    <p className="text-body-color mt-2 text-center">
+                      No user results.
+                    </p>
                   )}
                 </div>
               )}
@@ -265,7 +300,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           )}
 
           {nothingFound && (
-            <p className="mt-10 text-center text-body-color">No results found.</p>
+            <p className="text-body-color mt-10 text-center">
+              No results found.
+            </p>
           )}
         </div>
       </section>

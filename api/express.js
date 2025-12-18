@@ -5,7 +5,9 @@ import jwt from "jsonwebtoken";
 import * as dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 
-dotenv.config({ path: ".env.local" });
+if (!process.env.PG_HOST) {
+  dotenv.config({ path: ".env.local" });
+}
 
 const app = express();
 const PORT = process.env.PORT || 3001;
